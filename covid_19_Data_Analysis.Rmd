@@ -1,0 +1,647 @@
+---
+title: "52414 - Covid-19 Data Analysis"
+author: "52414"
+date: "6/4/2022"
+output: html_document
+---
+
+# *Lab 1: Basic Data Wrangling and Plotting, Distributions*  
+
+
+
+```{r, include=FALSE}
+library(tidyverse) # This includes dplyr, stringr, ggplot2, .. 
+library(data.table)
+library(rworldmap) # world map
+library(ggthemes)
+library(reshape2) # melt: change data-frame format long/wide
+library(e1071) # skewness and kurtosis
+```  
+<br/><br/>
+
+## Analysis of the World Covid-19 Dataset         
+    
+The `world-of-data` website hosts world-wide epidemiological data on the Corona Virus (COVID-19). 
+The dataset is compiled by the Johns Hopkins University Center for Systems Science and Engineering (JHU CCSE) from various sources, 
+and follows The dataset contains data since January 2020. For the data and more information about it, please visit [here](https://github.com/owid/covid-19-data/tree/master/public/data).    <br>
+
+we will focus on analyzing the Covid-19 cases, deaths and vaccinations data over time for different countries and continents.   
+
+
+### Questions: 
+
+1. **Loading data and basic processing:**
+    a. Load the complete covid19 dataset in `csv` format from [world-of-data](https://github.com/owid/covid-19-data/tree/master/public/data) into a data-frame in `R`.     
+Change if needed the class of the `date` variable to `Date` and check that the class is correct.   
+
+
+    b. List in a table the top five *dates* in terms of number of `new_cases` for `High income` countries. Show only the date and the number of new cases  at this date. <br>
+Repeat the same with two additional separate tables for top five dates for `new_deaths` and `new_vaccinations`. 
+
+2. **Comparing low vs. high income countries:**
+    a. Write a function that receives as input the data-frame, and a column name as string. The function plots 
+the value of the input column as a function of the date for both `High income` and `Low income` countries,
+ shown on the same graph with different colors or symbols.  Use meaningful axis and plot labels, and add an informative legend. `NA` or other no-number values should not be displayed.
+
+    b. Use the function written in (a.) and plot of the number of `new_cases_per_million` vs. date for the high vs. low income countries. 
+Next, make a similar plot for the *log* of the *smoothed* number of new cases per million, `new_cases_smoothed_per_million`.
+Which plot is easier to interpret? explain. <br>
+Similarly, make two additional separate plots for the *log* of the *smoothed* number of new deaths and new vaccinations per million as a function of date for the high vs. low income countries. Describe the plotted results.
+
+
+3. **Storing and analyzing current (cumulative) values:**
+    a. Create a new data-frame called `current` with *one row per country* (and other locations), that for each country will store as columns the country name (`location`) and `continent`, and also the **current** values (latest date reported for each value) for: 
+`total_cases_per_million`, `total_deaths_per_million`, 
+`total_vaccinations_per_hundred`, `people_fully_vaccinated_per_hundred`, `total_boosters_per_hundred` and `excess_mortality_cumulative_per_million`. 
+
+    b. Show the values for the current `total_deaths_per_million` in different countries in a histogram with 30 bins. Does this histogram look close to the normal distribution? 
+Compute the *skewness* and *kurtosis* for this distribution, and explain what they mean about the empirical distribution of the data. 
+
+    c. Next, make a scatter plot showing the current `total_deaths_per_million` (y-axis) vs. the current `total_cases_per_million`. Compute a linear regression line of the total number of deaths per million as a function of the total number of cases per million and add the fitted regression line to the plot. What is the slope and what does it represent? 
+
+
+
+4. **Vaccinations in different continents:**
+    a. For each of the six different continents (`Africa`, `Asia`, `Europe`, `North America`, `Oceania`, `South America`), make a boxplot of the distribution of the (current) total number of vaccinations per hundred in all the countries in the continent. Show one figure with the six boxplots next to each other. (Use the new `current` data-frame created in qu. 3).
+Find two outlier countries (can be of any continent) and write their name and value.
+
+    b. Define (for the original data-frame from qu. 1) a new column called `booster_ratio`, that lists for each date the fraction of individuals that got a third, booster shot in a country (`total_boosters`), out of all individuals that got two shots (`people_fully_vaccinated`), by dividing the two columns (if either of them is `NA` or if the denominator is zero, set `booster_ratio` to `NA`).
+Plot the `booster_ratio` as a function of time for the six continents (on the same plot, using different colors) and describe the results.
+
+5. **Displaying monthly data:**
+    a. For each month from January 2020 until March 2022 compute the total number of new cases per million in this month for each country individually (around 230 numbers for each month), and make a boxplot representing the empirical distribution fo these ~230 values. Show the boxplots for all months in one plot together in a chronological order, from left to right.
+
+        *Guidance:* (i) Beware to not double-count cases/deaths/vaccinations. (ii) Treat each month separately (e.g. March 2020 and March 2022 are different).
+
+    b. Repeat (a.), but this time with the total number of `new_deaths` and `new_vaccinations` for each month (two separate plots). 
+
+        What can you conclude about the pandemic at different periods from these plots? describe the results for each of the three plots in 2-3 sentences. 
+
+
+6. **R - disease reproduction number:**
+    Add to the covid data-frame a new column called `R_cases`, defined for `location` and `date` as the number of `new_cases_smoothed` at this date, divided by the value of the same variable seven days before (if the value seven days before is zero or not defined, define `R_cases` at the current date to be `NA`).
+This column represents roughly the expected number of people that each case infects, and determines the spread of the disease, with values above (below) one indicating that the disease is spreading (declining).   <br>
+
+    Plot the `R_cases` value as a function of time for `Israel`, `United Kingdom` and `United States`, and describe the results. <br>
+List in a table the number of days at which the disease was spreading (value above 1) in each of the three countries. 
+
+
+7. **Displaying data on the world map:**
+    Use the `rworldmap` package to display the world map and color each country based on the `total_deaths_per_million`. 
+Repeat for `total_vaccinations_per_hundred`, and `excess_mortality_cumulative_per_million`. Describe the resulting maps in a couple of sentences.
+
+    List the top three countries for each of these variables in a table.  
+
+    **Guidance:** Use the `joinCountryData2Map` and `mapCountryData` commands to make the plots. 
+Keep countries with missing data in white. 
+
+
+
+8. **Cross correlations and delay from diagnosis to death:**
+We want to use the data and *cross-correlation* in order to study the typical *time delay* between *diagnosis* of Covid-19 and *death* from Covid-19 for cases not surviving the disease. For two functions of time $X(t)$ and $Y(t)$ (here $t$ is discrete, representing for example days) we define their *cross-correlation* at time-delay $\Delta_t$ as follows: $cross_{corr}(\Delta_t ; X, Y) = Corr(X(t), Y(t+\Delta_t))$. <br>
+That is, the cross-correlation function at the time-delay $\Delta_t$ for two vectors of length $n$ is obtained by computing the Pearson correlation coefficient of the vector $X[1,...,n-\Delta_t]$ with the vector $Y[\Delta_t+1,...,n]$, for $\Delta_t>0$. For $\Delta_t < 0$ we replace the role of $X$ and $Y$ in this formula. 
+
+    a. Write a function that receives as input the data-frame, a country name and the name of two columns, and computes the value of their cross-correlation in this country for time delay of up to two months apart, that is for all values of $\Delta_t$ between $-60$ days and $60$ days. 
+The function should return a vector of length $121$ representing these correlations. 
+*Do not* use available cross-correlation functions in $R$, but write the function yourself.
+
+    b. Use the function from (a.) to compute the cross correlation between the number of `new_cases_smoothed` and `new_deaths_smoothed` for the entire *World*, and plot it as a function of $\Delta_t$. 
+At what time delay is the cross correlation maximized? what is your interpretation of this time-delay? 
+
+
+9. **Death risk after Covid-19 infection:**
+    a. Add to the main covid data-frame a new column called `death_rate`, defined for each `location` and `date` as the number of `total_deaths` divided by the number of `total_cases`. This column represents the risk of a person diagnosed with covid to die from the disease. 
+Plot for each of the six continents and the entire world the `death_rate` as a function of time (one plot with separate colors/symbols). Since there is a delay from time of diagnosis to time of death, the initial values of this column are less reliable as a measure of death risk, hence start your plot on *January 1st, 2021*. Do we see a decrease in the risk over time? can you suggest explanations for the observed trends? 
+
+    b. Make a similar plot for all continents and the world, but for the `total_vaccinations_per_hundred` variable. Do the plots suggest that the change in risk is correlated to the change in the number of vaccinations?
+
+10. **Excess mortality:**
+It is claimed that in some countries the death-rate from Covid-19 is under-reported. We can investigate this using excess mortality data - this data lists the number of deaths from all causes at each country, compared to the usual number of deaths at the same country and date calculated from previous years mortality data. The gap between the two, representing and increase (or decrease) in deaths beyond the usual rate, is called 'excess mortality', and might be partially or fully explained by deaths from Covid-19.
+    a. Use the `current` data-frame to make a scatter plot of the current date `total_deaths_per_million` vs. the `excess_mortality_cumulative_per_million`
+for all countries for which excess mortality data is available. Add the lines $y=x, y=x+2000$ and $y=x-2000$ to the plot. Mark on the graph in a different color all the countries for which the difference between the the excess mortality and the covid death rate (per million) is at least 2000 and add their names to the plot (you can use the `text` function). 
+
+    b. Pick three countries where the excess mortality was at least 2000 per million *above* the covid death rate, and that have at least $50$ available data points for each for `excess_mortality_cumulative_per_million`. 
+Use the main covid data-frame to plot as a function of time both the `total_deaths_per_million` and the `excess_mortality_cumulative_per_million` for each country (one plot - use different colors/symbols). Identify from the plot for each country the time periods where most deaths not explained by Covid-19 occurred. 
+
+**Solution:**  
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r, include=FALSE}
+library(tidyverse) 
+library(data.table)
+library(rworldmap) 
+library(ggthemes)
+library(reshape2) 
+library(e1071) 
+library(lubridate)
+```
+
+*<u> Question 1 </u>*
+
+<u> Part A </u>
+
+```{r} 
+df <- read.csv("owid-covid-data.csv")
+df$date <- as.Date(df$date)
+```
+
+<u> Part B </u>
+
+```{r} 
+high_income_dataset <- df[df$location == "High income",]
+dates_new_cases <-arrange(high_income_dataset,desc(new_cases))[1:5,c("date","new_cases")]
+dates_new_death <-arrange(high_income_dataset,desc(new_deaths))[1:5,c("date","new_deaths")]
+dates_new_vaccinations <-arrange(high_income_dataset,desc(new_vaccinations))[1:5,c("date","new_vaccinations")]
+cor(dates_new_cases$new_cases,dates_new_death$new_deaths)
+dates_new_cases
+dates_new_death
+dates_new_vaccinations
+```
+
+we can see through the tables above that there was a peak in new cases at the 
+date 2022-01-19 and after that it started coming down a little . 
+can see that during January there were a lot of new deaths as well 
+making sense because of the peak in new cases causing more death as well.
+
+
+*<u> Question 2 </u>*
+
+<u> Part A </u>
+
+```{r} 
+plot_func <- function(x,y){
+  data <- x[x$location == "High income" | x$location == "Low income",]
+  ggplot(data) +  geom_point(aes(date,get(y),colour = location))+ylab(y)
+}
+```
+
+<u> Part B </u>
+
+```{r} 
+plot_func(df,"new_cases_per_million")
+df$log_new_cases_per_million <- log(df$new_cases_per_million)
+plot_func(df,"log_new_cases_per_million")
+```
+
+
+Log-scale informs on relative changes , while linear-scale informs on absolute changes. When you care about relative changes, use the log-scale; when you care about absolute changes, use linear-scale.
+in our context people with low income have small absolute change that's
+why the second plot is easier to interpret. 
+we can interpret from the second graph that both low/high income
+endured ups and downs while high income countries always have higher count of new_cases_per_million.
+
+```{r}
+df$log_new_deaths_smoothed <-log(df$new_deaths_smoothed)
+df$log_vaccinations_smoothed_per_million <-log(df$new_vaccinations_smoothed_per_million)
+plot_func(df,"log_new_deaths_smoothed")
+plot_func(df,"log_vaccinations_smoothed_per_million")
+```
+
+we can see that "log_vaccinations_smoothed_per_million" 
+that over time low income locations increased their vaccinations percentage while at high income locations there was a big increase of vaccinations at the beginning
+of 2021 and then another spike at the end of the year 2021
+(probably the third vaccination).
+
+we can see as well that "log_new_deaths_smoothed" looks 
+pretty similar to "log_new_cases_per_million" witch makes
+sense seeing how more cases brings more deaths.
+
+through the data we see that there is apparently more death and more cases in high income countries . yet this is probably not the case and the explanation for this is that in low income countries there is poor documentation and probably a lot of people were sick and died from covid19 but it never was documented in the first place.
+
+
+*<u> Question 3 </u>*
+
+<u> Part A </u>
+
+At this question, we'll be showing the latest information gathered for each
+country, concerning the amount of cases, deaths and excess mortality per million, vaccination, boosters and fully vaccinated population per hundred.
+We'll extract the unique countries for "location" column, and for each
+kind of value mentioned above, we'll find the latest information by
+subseting rows, so that we could extract the latest information.
+
+```{r}
+current = df[c("location", "continent", "date", "total_cases_per_million", "total_deaths_per_million", "total_vaccinations_per_hundred", "people_fully_vaccinated_per_hundred", "total_boosters_per_hundred", "excess_mortality_cumulative_per_million")]
+current = current %>%
+  group_by(location)
+current = fill(current, names(current),.direction = "updown")
+current = current %>%
+  filter(date == max(date))
+```
+
+In the current dataframe, must of the data is logically correct, and within the range alloted to them (less than a million or less than a hundred in the relevant columns), but in some columns, such as "total_vaccinations_per_hundred", it can be seen that the values are above 100,
+which probably means that there are more vaccination ready to be injected than population, in certain countries.
+
+<u> Part B </u>
+
+To solve this question, we will study the distribution of "total_deaths_per_million" column.
+
+
+As seen below, the distribution does look like a normal distribution, but as we will see next, it does not distribute symmetrical y.
+
+```{r}
+x = rep("",243)
+ggplot(current, mapping = aes(x = total_deaths_per_million)) + geom_histogram(bins = 30)
+```
+
+
+The result below is the skewness of "total_deaths_per_millon" column. the result is bigger than zero, meaning that the distribution is not symmetrical, and the mean is bigger than the median. the distribution has left tail.
+
+```{r}
+total_death_q_3 = current$total_deaths_per_million
+skewness(total_death_q_3, na.rm = TRUE)
+```
+
+The result below is the kurtosis of "total_deaths_per_millon" column. the result is bigger than zero, meaning that it is a fat tailed distribution, where extreme outcomes are more common than would be predicted by a standard normal distribution.
+
+```{r}
+kurtosis(current$total_deaths_per_million, na.rm = TRUE)
+```
+
+
+<u> Part C </u>
+
+Shown below, is the Scatter-plot of "total_cases_per_million" and "total_deaths_per_million", with the regression line which shows a positive correlation between the two variables. the slope is 0.004012073  growth of deaths per million for every growth in cases per million.
+
+```{r}
+q_3_reg = lm(current$total_deaths_per_million ~ current$total_cases_per_million)
+plot(x = current$total_cases_per_million, y = current$total_deaths_per_million, main = "Cases vs Death" ,xlab = "Cases per million", ylab = "Deaths per million") + 
+abline(q_3_reg, col = "blue")
+```
+
+
+*<u> Question 4 </u>*
+
+<u> Part A </u>
+
+
+```{r} 
+cur <- current[c("continent","location","total_vaccinations_per_hundred")]
+cur <- na.omit(cur)
+cur <- cur[cur$continent != "",]
+ggplot(cur)+geom_boxplot() + aes(x=continent, y=total_vaccinations_per_hundred, color = continent) + xlab("continents")+ylab("total vaccinations per hundred")+ggtitle("Distrubtion of number of vaccinations per hundred ")
+```
+As we can see through the box plot we can notice some outliers in the data
+we will choose the maximum outlier in Africa and Europe.
+
+```{r}
+africa_outlier_index <- which.max(cur$total_vaccinations_per_hundred[cur$continent == "Africa"])
+africa_outlier_location <- cur[cur$continent == "Africa",][africa_outlier_index,]$location
+africa_outlier_val <- cur$total_vaccinations_per_hundred[cur$continent == "Africa"][africa_outlier_index]
+europe_outlier_index <- which.max(cur$total_vaccinations_per_hundred[cur$continent == "Europe"])
+europe_outlier_location <- cur[cur$continent == "Europe",][europe_outlier_index,]$location
+europe_outlier_val <- cur$total_vaccinations_per_hundred[cur$continent == "Europe"][europe_outlier_index]
+paste("the value of total vaccinations per hundred for" ,africa_outlier_location ,"from Africa is",africa_outlier_val)
+paste("the value of total vaccinations per hundred for ",europe_outlier_location," from Europe is",europe_outlier_val)
+```
+
+
+
+<u> Part B </u>
+
+We will created a new vector for people fully vaccinated by replacing any 
+0 with NA so we would not have any inf values in are booster_ratio column.
+We will also use a data frame containing the only relevant columns for this
+tasks.
+
+```{r}
+people_fully_vaccinated <- ifelse(df$people_fully_vaccinated == 0,NA,df$people_fully_vaccinated)
+df$booster_ratio <- df$total_boosters/people_fully_vaccinated
+booster_time_continent <- df[!is.na(df$booster_ratio),c("continent","booster_ratio","date")]
+booster_time_continent <- booster_time_continent[booster_time_continent$continent != "",]
+booster_time_continent %>% 
+  ggplot( aes(x = date, y = booster_ratio, color = continent, group = continent,)) + geom_point() 
+  
+```
+
+we can see by looking at the plot that at the beginning of January 2021 
+a small amount of countries from south America and from Europe were getting the third vaccinations before the rest of the world.
+later on around August-September of 2021 Asia had a big jump in vaccinations ratio rate by about 70% and by the end of 2021 and beginning of year 2022 most
+of the world were getting the third vaccinations.
+
+
+*<u> Question 5 </u>*
+<br>
+<u> Part A </u>
+<br>
+We will try to present the range of values of cases, deaths and vaccinations in different countries, through the months of the pandemic (January 2020 and April 2022).
+<br>
+In the graph below, we are showing the range of values of "New cases per million", and we can see that the growth is similar at most countries through 2020 and 2021, but in the beginning of 2022 we can see abnormal observations.
+
+```{r}
+df_cases_q_5 = data.frame(df$location, df$date, df$new_cases_per_million)
+colnames(df_cases_q_5) = c("location", "date", "new_cases_per_million")
+df_cases_q_5$date = floor_date(df_cases_q_5$date, unit = "month")
+df_cases_q_5_location = df_cases_q_5 %>% group_by(location, date) %>% summarise(new_cases_per_million = sum(new_cases_per_million))
+boxplot(new_cases_per_million ~ date , data = df_cases_q_5_location, las = 2, cex.axis = 0.70, main = "New cases per million vs Jan 20 - Apr 22", xlab = "", ylab = "New cases per million")
+```
+
+
+<u> Part B </u>
+
+The graph below shows us the amount of deaths in each month in different countries. we can see that there was a slight growth since the beginning of the pandemic, until 2021 which had a bigger amount of deaths, and than there was a decrease in the beggining of 2022.
+
+```{r}
+df_deaths_q_5 = data.frame(df$location, df$date, df$new_deaths)
+colnames(df_deaths_q_5) = c("location", "date", "new_deaths")
+df_deaths_q_5$date = floor_date(df_deaths_q_5$date, unit = "month")
+df_deaths_q_5_location = df_deaths_q_5 %>% group_by(location, date) %>% summarise(new_deaths = sum(new_deaths))
+boxplot(new_deaths ~ date , data = df_deaths_q_5_location, las = 2, cex.axis = 0.70, main = "New deaths vs Jan 20 - Apr 22", xlab = "", ylab = "New deaths")
+```
+
+<br>
+The graph below shows us the number of new vaccinated people in different countries through the months of the pandemic. as above, we can see growth in the beginning of the pandemic, with a peak in 2021, and slight decrease in 2022.
+
+```{r}
+df_vacc_q_5 = data.frame(df$location, df$date, df$new_vaccinations)
+colnames(df_vacc_q_5) = c("location", "date", "new_vaccinations")
+df_vacc_q_5$date = floor_date(df_vacc_q_5$date, unit = "month")
+df_vacc_q_5_location = df_vacc_q_5 %>% group_by(location, date) %>% summarise(new_vaccinations = sum(new_vaccinations))
+boxplot(new_vaccinations ~ date , data = df_vacc_q_5_location, las = 2, cex.axis = 0.63,main = "New vaccinations vs Dec 20 - Apr 22", xlab = "", ylab = "New vaccinations")
+```
+
+
+*<u> Question 6 </u>*
+
+
+To define R_cases per location and date we use group_by and then use 
+the ifelse function while the test is if the new_cases_smoothed seven days
+back is not zero then divided between the columns.
+else(in the case it is zero) then the result would be "inf" and thus we 
+instead replace it with NA.
+
+
+```{r} 
+df <- df %>% 
+  group_by(location) %>% 
+  mutate(R_cases = ifelse(
+ lag(new_cases_smoothed, n = 7)!= 0 , new_cases_smoothed / lag(new_cases_smoothed, n = 7), NA))
+```
+
+First look at the R_cases for Israel,United kingdom and United states as a 
+function of time.
+
+```{r} 
+ggplot(df[df$location %in% c("Israel", "United Kingdom", "United States"),]) + aes(x = date,y = R_cases, color = location)+geom_line(size = 1)
+```
+
+Because there are extreme values at the beginning of year 2020 we will look 
+at the data again this time including dates only from may 2020 and after
+so we can get a better understanding at the fluctuations of the data. 
+
+we can see the different peaks of the rate of the spread in all 
+three countries as a function of time.
+for example in July 2021 the spread was higher then 5.
+
+```{r} 
+ggplot(df[df$location %in% c("Israel", "United Kingdom", "United States") & df$date > as.Date("2020-05-01") ,]) + aes(x = date,y = R_cases, color = location)+geom_line(size = 1) + geom_hline(yintercept=1, linetype="dashed", color = "red")
+```
+
+
+To show in a table the amount of days that the disease was spreading 
+we create a binary vector representing whether or not at day i the disease was
+spreading or not.
+then we sum up the  days for each of the three locations and 
+put it in a data frame.
+
+```{r} 
+over_under_one <- ifelse(df$R_cases > 1 , 1, 0)
+df$over_under_one <- over_under_one
+isr <- sum(df$over_under_one[df$location == "Israel"],na.rm = T)
+uk <- sum(df$over_under_one[df$location == "United Kingdom"],na.rm = T)
+us <- sum(df$over_under_one[df$location == "United States"],na.rm = T)
+disease_spreading_days <- data.frame("Israel" = isr,"United kingdom" =uk,"United States" = us )
+disease_spreading_days
+```
+
+*<u> Question 7 </u>*
+<br>
+At this question, we will present the latest information from each country regarding Total deaths per million, Total vaccinations per hundred, Excess mortality cumulative per million, on a map of the world, while using colours to show large and small value range, for each country.
+
+```{r}
+df_q_7 = df[c("iso_code", "location", "date", "total_deaths_per_million", "total_vaccinations_per_hundred", "excess_mortality_cumulative_per_million")]
+colnames(df_q_7) = c("iso_code", "location", "date", "Total deaths per million", "Total vaccinations per hundred", "Excess mortality cumulative per million")
+df_q_7 = df_q_7 %>%
+  group_by(location)
+df_q_7 = fill(df_q_7, names(df_q_7),.direction = "updown")
+df_q_7 = df_q_7 %>%
+  group_by(location) %>%
+  filter(date == max(date))
+```
+
+<br>
+The map below shows the total number of deaths per million in different countries around the world.
+
+```{r}
+df_q_7 = joinCountryData2Map(df_q_7, joinCode = "ISO3", nameJoinColumn = "iso_code")
+mapCountryData(df_q_7, nameColumnToPlot = "Total deaths per million")
+```
+
+The map below shows the total number of vaccinated people per hundred in different countries around the world.
+
+```{r}
+mapCountryData(df_q_7, nameColumnToPlot = "Total vaccinations per hundred")
+```
+
+The map below shows the Excess mortality cumulative per million in different countries around the worl=d.
+
+```{r}
+mapCountryData(df_q_7, nameColumnToPlot = "Excess mortality cumulative per million")
+```
+
+Next, we created tables which hold the names of the top 3 countries in "Total deaths per million", "Total vaccinations per hundred" and "Excess mortality cumulative per million" columns.
+<br>
+Below, a table which holds the top 3 countries in "Total deaths per million" column.
+
+```{r}
+sorted_deaths_per_million = df_q_7[order(df_q_7$`Total deaths per million`, decreasing = TRUE),]
+top_3_deaths_per_million = table(sorted_deaths_per_million$location[c(1,2,3)])
+top_3_deaths_per_million
+```
+
+Next, a table which holds the top 3 countries in "Total vaccinations per hundred" column.
+
+```{r}
+sorted_vacc_per_hundred = df_q_7[order(df_q_7$`Total vaccinations per hundred`, decreasing = TRUE),]
+top_3_vacc_per_hundred = table(sorted_vacc_per_hundred$location[c(1,2,3)])
+top_3_vacc_per_hundred
+```
+
+Below is the last table, which holds the top 3 countries in "Excess mortality cumulative per million" column.
+
+```{r}
+sorted_mortal_per_million = df_q_7[order(df_q_7$`Excess mortality cumulative per million`, decreasing = TRUE),]
+top_3_mortal_per_million = table(sorted_mortal_per_million$location[c(1,2,3)])
+top_3_mortal_per_million
+```
+
+*<u> Question 8 </u>*
+
+<u> Part A </u>
+
+At this question, we will write a function that will find the cross correlation between two columns, of a certain country, with a range of two months (-60 days or 60 days).
+about the function - we created a positive and negative sequences of deltas, that we could run on in the different loops. at first, we run on the negative deltas loop, at which column_x and column_y changed positions, so that we pushed x timeline forward. each correlation was added into a cross_correlation_vector. than, we run on the positive delats loop, at which we pushed y timeline forward. each correlation was added into a cross_correlation_vector. we returnd the vector.
+
+```{r, echo=TRUE, include=TRUE}
+cross_cor_func = function(df_q_8_func, country_name, column_x, column_y){
+  delta_t_plus = seq(1,60)
+  delta_t_minus = seq(-60,-1)
+  df_q_8 = as.data.frame(subset(df_q_8_func, location == country_name))
+  cross_correlation_vector = c()
+  for (j in delta_t_minus) {
+    delta_j_cor = cor(head(df_q_8[ , column_y], j), df_q_8[ , column_x][-1:j], use = "complete.obs")
+    cross_correlation_vector = c(cross_correlation_vector, delta_j_cor)
+  }
+  delta_0 = cor(df_q_8[ , column_x],df_q_8[ , column_y], use = "complete.obs")
+  cross_correlation_vector = c(cross_correlation_vector,delta_0)
+  for (i in delta_t_plus) {
+    delta_i_cor = cor(head(df_q_8[ , column_x], -i), df_q_8[ , column_y][-1:-i])
+    cross_correlation_vector = c(cross_correlation_vector, delta_i_cor)
+  }
+  return(cross_correlation_vector)
+}
+```
+
+<u> Part B </u>
+
+Below attached the graph which shows the cross correlation between "new_cases_smoothed" and "new_deaths_smoothed", summed for the entire world. we can see in the graph that the maximum cross correlation is achieved around delta = 0. it is logically correct because as the value of new cases grow, so does the new deaths value grow. so, if you change the timeline of one of the columns, you create a gap between the real values which , 
+
+```{r, echo=FALSE, include=TRUE}
+df_q_8_b = df %>% group_by(date) %>% summarise(location = "World" ,new_cases_smoothed = sum(na.omit(new_cases_smoothed)), new_deaths_smoothed = sum(na.omit(new_deaths_smoothed)))
+cross_q_8_b = cross_cor_func(df_q_8_b, "World", "new_cases_smoothed", "new_deaths_smoothed")
+plot(x = seq(-60,60), y = cross_q_8_b, xlab = "Delta", ylab = "Cross Correlation",
+     main = "Worlds Cross Correlation New cases smoothed and New deaths")
+```
+
+
+*<u> Question 9 </u>*
+<br>
+<u> part A </u>
+<br>
+
+Now, we will be showing the change in the death rate, and the amount of vaccination per hundred, in the different continents and in the world in total, along the period of the pandemic, starting from 01 JAN 2021.
+<br>
+In the graph below, we can follow the change of death rate along the period of the pandemic, as explained above. except from Oceania, that had an major increase in death rate, most countries stayed at the same range of values, and we can watch a decrease in the late months of the pandemic. there are many possible explanations, such as the amount of vaccination given which decrease the chances of having a serious disease or the virus variants turned less aggressive along the pandemic period.
+
+```{r}
+df_q_9_world = df[df$date >= "2021-01-01",]
+df_q_9_world = df_q_9_world[c("continent", "location", "date", "total_deaths", "total_cases")]
+df_q_9_world = na.omit(df_q_9_world)
+df_q_9_world$death_rate = df_q_9_world$total_deaths / df_q_9_world$total_cases
+df_q_9_asia = subset(df_q_9_world, continent == "Asia")
+df_q_9_africa = subset(df_q_9_world, continent == "Africa")
+df_q_9_europe = subset(df_q_9_world, continent == "Europe")
+df_q_9_north_america = subset(df_q_9_world, continent == "North America")
+df_q_9_south_america = subset(df_q_9_world, continent == "South America")
+df_q_9_oceania = subset(df_q_9_world, continent == "Oceania")
+df_q_9_world = df_q_9_world %>% group_by(date) %>% summarise(death_rate = mean(death_rate))
+df_q_9_asia = df_q_9_asia %>% group_by(date) %>% summarise(death_rate = mean(death_rate))
+df_q_9_africa = df_q_9_africa %>% group_by(date) %>% summarise(death_rate = mean(death_rate))
+df_q_9_europe = df_q_9_europe %>% group_by(date) %>% summarise(death_rate = mean(death_rate))
+df_q_9_north_america = df_q_9_north_america %>% group_by(date) %>% summarise(death_rate = mean(death_rate))
+df_q_9_south_america = df_q_9_south_america %>% group_by(date) %>% summarise(death_rate = mean(death_rate))
+df_q_9_oceania = df_q_9_oceania %>% group_by(date) %>% summarise(death_rate = mean(death_rate))
+ggplot() +
+  ggtitle("Death rate - World and Continents") +
+  labs(x = "Time", y = "Death rate") +
+  geom_line(data = df_q_9_world, aes(x = date, y = death_rate, color = "World")) +
+  geom_line(data = df_q_9_asia, aes(x = date, y = death_rate, color = "Asia")) +
+  geom_line(data = df_q_9_africa, aes(x = date, y = death_rate, color = "Africa")) +
+  geom_line(data = df_q_9_europe, aes(x = date, y = death_rate, color = "Europe")) +
+  geom_line(data = df_q_9_north_america, aes(x = date, y = death_rate, color = "North America")) +
+  geom_line(data = df_q_9_south_america, aes(x = date, y = death_rate, color = "South America")) +
+  geom_line(data = df_q_9_oceania, aes(x = date, y = death_rate, color = "Oceania"))
+```
+
+<u> part B </u>
+<br>
+
+Below, attached the graph that follow the change of total vaccinations per hundred people in different continents and the world, along the period of the pandemic. we can see that at the end of the period, the amount of vaccinations given grow dramatically. furthermore, we can see strong correlation between the death rate and amount of vaccination given, which is logically correct, because as explained above, vaccination reduce the risk of having a serious disease.
+<br>
+Important note - we can see drops in the different graphs, that happen because of missing data. to try and deal with the problem, we choose to use the median of each continent each day, which at most times keep a similar value, even when data is missing.
+
+```{r}
+df_q_9_world_vacc = df[df$date >= "2021-01-01",]
+df_q_9_world_vacc = df_q_9_world_vacc[c("continent", "location", "date","total_vaccinations_per_hundred")]
+df_q_9_world_vacc = na.omit(df_q_9_world_vacc)
+df_q_9_asia_vacc = subset(df_q_9_world_vacc, continent == "Asia")
+df_q_9_africa_vacc = subset(df_q_9_world_vacc, continent == "Africa")
+df_q_9_europe_vacc = subset(df_q_9_world_vacc, continent == "Europe")
+df_q_9_north_america_vacc = subset(df_q_9_world_vacc, continent == "North America")
+df_q_9_south_america_vacc = subset(df_q_9_world_vacc, continent == "South America")
+df_q_9_oceania_vacc = subset(df_q_9_world_vacc, continent == "Oceania")
+df_q_9_world_vacc = df_q_9_world_vacc %>% group_by(date) %>% summarise(total_vaccinations_per_hundred = median(total_vaccinations_per_hundred))
+df_q_9_asia_vacc = df_q_9_asia_vacc %>% group_by(date) %>% summarise(total_vaccinations_per_hundred = median(total_vaccinations_per_hundred))
+df_q_9_africa_vacc = df_q_9_africa_vacc %>% group_by(date) %>% summarise(total_vaccinations_per_hundred = median(total_vaccinations_per_hundred))
+df_q_9_europe_vacc = df_q_9_europe_vacc %>% group_by(date) %>% summarise(total_vaccinations_per_hundred = median(total_vaccinations_per_hundred))
+df_q_9_north_america_vacc = df_q_9_north_america_vacc %>% group_by(date) %>% summarise(total_vaccinations_per_hundred = median(total_vaccinations_per_hundred))
+df_q_9_south_america_vacc = df_q_9_south_america_vacc %>% group_by(date) %>% summarise(total_vaccinations_per_hundred = median(total_vaccinations_per_hundred))
+df_q_9_oceania_vacc = df_q_9_oceania_vacc %>% group_by(date) %>% summarise(total_vaccinations_per_hundred = median(total_vaccinations_per_hundred))
+ggplot() +
+  ggtitle("Total vaccinations per hundred - World and Continents") +
+  labs(x = "Time", y = "Vacc per hundred") +
+  geom_line(data = df_q_9_world_vacc, aes(x = date, y = total_vaccinations_per_hundred, color = "World")) +
+  geom_line(data = df_q_9_asia_vacc, aes(x = date, y = total_vaccinations_per_hundred, color = "Asia")) +
+  geom_line(data = df_q_9_africa_vacc, aes(x = date, y = total_vaccinations_per_hundred, color = "Africa")) +
+  geom_line(data = df_q_9_europe_vacc, aes(x = date, y = total_vaccinations_per_hundred, color = "Europe")) +
+  geom_line(data = df_q_9_north_america_vacc, aes(x = date, y = total_vaccinations_per_hundred, color = "North America")) +
+  geom_line(data = df_q_9_south_america_vacc, aes(x = date, y = total_vaccinations_per_hundred, color = "South America")) +
+  geom_line(data = df_q_9_oceania_vacc, aes(x = date, y = total_vaccinations_per_hundred, color = "Oceania"))
+```
+
+*<u> Question 10 </u> *
+<br>
+<u> Part A </u>
+
+we added a new column called "excess_mortality" that per date and location 
+indicates if the excess mortality is over 2000 or under it .
+
+```{r} 
+lower = geom_abline(intercept = -2000, slope = 1)
+higher = geom_abline(intercept = 2000, slope = 1)
+middle = geom_abline(intercept = 0, slope = 1)
+excess_mortality <- ifelse(current$excess_mortality_cumulative_per_million-current$total_deaths_per_million >= 2000 ,"over or equal 2000","under 2000")
+current$excess_mortality <- excess_mortality
+```
+
+
+```{r} 
+ggplot(current)+aes(x = total_deaths_per_million,y = excess_mortality_cumulative_per_million,color = excess_mortality)+geom_point()+lower+middle+higher+ scale_colour_discrete(na.translate = F)+xlab("total deaths per million")+ylab("excess mortality cumulative per million")+ggtitle("excess mortality vs covid death rate ") +geom_text(aes(label=ifelse(excess_mortality == "over or equal 2000", location, NA)), size = 3, check_overlap=T,
+) 
+```
+
+<u> Part B </u>
+
+we first choose three locations that have more then 50 observations in the data.
+
+```{r, echo=FALSE, include=FALSE}
+df_q_10_b <- subset(current,subset = current$excess_mortality == "over or equal 2000")
+length(na.omit(df$excess_mortality_cumulative_per_million[df$location == "Bulgaria"]))
+length(na.omit(df$excess_mortality_cumulative_per_million[df$location == "Romania"]))
+length(na.omit(df$excess_mortality_cumulative_per_million[df$location == "Lithuania"]))
+```
+
+below is attached the plot that shows the total deaths per million and 
+the excess mortality cumulative per million for Bulgaria,Romania,Lithuania.
+
+
+```{r}
+df_q_10_b = subset(df, df$location == "Bulgaria" | df$location == "Romania"
+                   | df$location == "Lithuania")
+df_q_10_b = df_q_10_b[c("location", "date", "total_deaths_per_million", "excess_mortality_cumulative_per_million")]
+ggplot(df_q_10_b) +
+  ggtitle("Total deaths and Excess mortality - Bulgaria, Romania and Lithuania",
+          subtitle = "Line graph = Total deaths & Point graph = Excess mortality") +
+  labs(x = "Time", y = "Total death & Excess mortality") +
+  geom_point(aes(x = date, y = excess_mortality_cumulative_per_million, color = location), size = 1) + 
+  geom_line(aes(x = date, y = total_deaths_per_million, color = location), size = 2)
+```
+
+
+by observing the plot we can say that until around (2020-10,2020-11) the excess
+mortality is close to zero meaning the death rate is around the same as year's
+before therefore not explained by covid19.
+this is the case for Romania and Bulgaria while Lithuania excess mortality 
+starts to grow first around 2020-09
